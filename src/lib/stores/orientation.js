@@ -1,52 +1,50 @@
-import { readable } from "svelte/store";
+import { writable } from "svelte/store";
 
+// Initial orientation values
+const initialOrientation = {
+  absolute: { alpha: 0, beta: 0, gamma: 0 },
+  relative: { alpha: 0, beta: 0, gamma: 0 }
+};
 
-const getRawOrientation = function(e) {
-  if ( !e ) {
-    return { alpha: 0, beta: 0, gamma: 0 };
-  } else {
-    return { alpha: e.alpha, beta: e.beta, gamma: e.gamma };
+// Create the store with initial values
+export const orientation = writable(initialOrientation);
+
+// Base orientation values for reference point
+let baseOrientation = {
+  alpha: 0,
+  beta: 0,
+  gamma: 0
+};
+
+// Reset the base orientation to current values
+export function resetBaseOrientation() {
+  if (typeof window !== 'undefined' && window.DeviceOrientationEvent) {
+    baseOrientation = {
+      alpha: initialOrientation.absolute.alpha,
+      beta: initialOrientation.absolute.beta,
+      gamma: initialOrientation.absolute.gamma
+    };
   }
 }
 
-const getOrientationObject = (e) => {
-  const orientation = getRawOrientation(e);
-  return {
-    absolute: orientation,
-    relative: { 
-      alpha: orientation.alpha - baseOrientation.alpha, 
-      beta: orientation.beta - baseOrientation.beta, 
-      gamma: orientation.gamma - baseOrientation.gamma, 
-    }
-  }
+// Initialize orientation detection on client
+if (typeof window !== 'undefined' && window.DeviceOrientationEvent) {
+  window.addEventListener('deviceorientation', handleOrientation);
 }
 
-let firstReading = true;
-let baseOrientation = getRawOrientation();
-
-export const resetBaseOrientation = () => {
-  firstReading = true;
-  baseOrientation = getRawOrientation();
-}
-
-export const orientation = readable( getOrientationObject(), function start( set ) {
-
-  // https://developer.mozilla.org/en-US/docs/Web/API/Window/ondeviceorientation
-  const handleOrientation = function(e) {
-
-    if ( firstReading ) {
-      firstReading = false;
-      baseOrientation = getRawOrientation(e);
-    }
-
-    const o = getOrientationObject(e);
-    set( o );
+// Handle device orientation changes
+function handleOrientation(event) {
+  const absolute = {
+    alpha: event.alpha || 0,
+    beta: event.beta || 0,
+    gamma: event.gamma || 0
   };
-
-  window.addEventListener("deviceorientation", handleOrientation, true);
-
-  return function stop() {
-    window.removeEventListener("deviceorientation", handleOrientation, true);
-  }
-
-});
+  
+  const relative = {
+    alpha: absolute.alpha - baseOrientation.alpha,
+    beta: absolute.beta - baseOrientation.beta,
+    gamma: absolute.gamma - baseOrientation.gamma
+  };
+  
+  orientation.set({ absolute, relative });
+}
